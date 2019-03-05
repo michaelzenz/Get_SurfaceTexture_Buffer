@@ -116,6 +116,7 @@ public class CameraWithTextureView extends Activity{
         mFullFrameBlit = new FullFrameRect(
                 new Texture2dProgram(Texture2dProgram.ProgramType.TEXTURE_EXT));
         mTextureId = mFullFrameBlit.createTextureObject();
+        //If I uncomment these 3 lines here there will be the "GLConsumer is already attached to a context" Error
 //        mCameraTexture = new SurfaceTexture(false);
 //        mCameraTexture.attachToGLContext(mTextureId);
 //        displayTextureView.setSurfaceTexture(mCameraTexture);
@@ -179,7 +180,7 @@ public class CameraWithTextureView extends Activity{
 
         mOffscreenSurface.makeCurrent();
         GLES20.glViewport(0, 0, VIDEO_WIDTH,VIDEO_HEIGHT);
-        mFullFrameBlit.drawFrame(mTextureId,mTmpMatrix);
+        mFullFrameBlit.drawFrame(mTextureId,mTmpMatrix);//needs to render to the surface first and needs the textureId to render
         mOffscreenSurface.getPixels();
     }
 
