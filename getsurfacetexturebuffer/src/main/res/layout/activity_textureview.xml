@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.constraint.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <com.airlife.getsurfacetexturebuffer.AspectFrameLayout
+        android:id="@+id/textureview_layout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentRight="true"
+        android:layout_centerInParent="true" >
+
+        <TextureView
+            android:id="@+id/camera_textureview"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="center" />
+
+    </com.airlife.getsurfacetexturebuffer.AspectFrameLayout>
+
+</android.support.constraint.ConstraintLayout>
