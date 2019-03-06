@@ -32,7 +32,7 @@ import java.io.IOException;
 import java.lang.ref.WeakReference;
 
 
-//The demo that use TextureView to get buffer from SurfaceTexture, Not yet finished
+//The demo that use TextureView to get buffer from SurfaceTexture, Works Now
 public class CameraWithTextureView extends Activity{
     private static final String TAG = CameraWithTextureView.TAG;
 
@@ -43,62 +43,19 @@ public class CameraWithTextureView extends Activity{
     private EglCore mEglCore;
     private SurfaceTexture mCameraTexture;  // receives the output from the camera preview
     private TextureView displayTextureView;
-    private FullFrameRect mFullFrameBlit;
-    private final float[] mTmpMatrix = new float[16];
-    private int mTextureId;
-    private int mFrameNum;
-    Boolean Initialized=false;
+    private FullFrameRect mFullFrameBlit; //renders the texture
+    private float[] mTmpMatrix = null;
+    private int mTextureId; //for the camera texture
     Boolean previewStarted=false;
 
     private Camera mCamera;
     private int mCameraPreviewThousandFps;
 
-    private MainHandler mHandler;
-
-    private OffscreenSurface mOffscreenSurface;
     private WindowSurface mWindowSurface;
+    private OffscreenSurface mOffscreenSurface;
 
-
-
-    private static class MainHandler extends Handler {
-        public static final int MSG_FRAME_AVAILABLE = 0;
-
-        private WeakReference<CameraWithTextureView> mWeakActivity;
-
-        public MainHandler(CameraWithTextureView activity) {
-            mWeakActivity = new WeakReference<CameraWithTextureView>(activity);
-        }
-
-        @Override
-        public void handleMessage(Message msg) {
-            CameraWithTextureView activity = mWeakActivity.get();
-            if (activity == null) {
-                Log.d(TAG, "Got message for dead activity");
-                return;
-            }
-
-            switch (msg.what) {
-                case MSG_FRAME_AVAILABLE: {
-                    activity.drawFrame();
-                    break;
-                }
-                default:
-                    throw new RuntimeException("Unknown message " + msg.what);
-            }
-        }
-    }
-
-    private class MySurfaceTexture extends SurfaceTexture {
-        public MySurfaceTexture(int texName) {
-            super(texName);
-            super.detachFromGLContext();
-        }
-        public MySurfaceTexture(boolean singleBufferMode) {
-            super(singleBufferMode);
-            super.detachFromGLContext();
-        }
-    }
-    MySurfaceTexture mSurfaceTexture;
+    private int viewWidth;
+    private int viewHeight;
 
     @Override
     protected void onCreate(final Bundle savedInstanceState) {
@@ -110,22 +67,8 @@ public class CameraWithTextureView extends Activity{
         displayTextureView=(TextureView) findViewById(R.id.camera_textureview);
         mEglCore = new EglCore(null, EglCore.FLAG_RECORDABLE);
 
-
-        mOffscreenSurface=new OffscreenSurface(mEglCore,VIDEO_WIDTH,VIDEO_HEIGHT);
-        mOffscreenSurface.makeCurrent();
-        mFullFrameBlit = new FullFrameRect(
-                new Texture2dProgram(Texture2dProgram.ProgramType.TEXTURE_EXT));
-        mTextureId = mFullFrameBlit.createTextureObject();
-        //If I uncomment these 3 lines here there will be the "GLConsumer is already attached to a context" Error
-//        mCameraTexture = new SurfaceTexture(false);
-//        mCameraTexture.attachToGLContext(mTextureId);
-//        displayTextureView.setSurfaceTexture(mCameraTexture);
-
         displayTextureView.setSurfaceTextureListener(mSurfaceTextureListener);
 
-
-        mHandler = new MainHandler(this);
-        Initialized=true;
     }
     @Override
     protected void onResume() {
@@ -136,10 +79,43 @@ public class CameraWithTextureView extends Activity{
         }
     }
 
+    SurfaceTexture.OnFrameAvailableListener mFrameAvailableListener=new SurfaceTexture.OnFrameAvailableListener() {
+        @Override
+        public void onFrameAvailable(SurfaceTexture surfaceTexture) {
+            mCameraTexture.updateTexImage();
+            if(mTmpMatrix==null){
+                mTmpMatrix=new float[16];
+                mCameraTexture.getTransformMatrix(mTmpMatrix);
+            }
+
+            // Fill the SurfaceView with it.
+            mWindowSurface.makeCurrent();
+            GLES20.glViewport(0, 0, viewWidth, viewHeight);
+            mFullFrameBlit.drawFrame(mTextureId, mTmpMatrix);
+            mWindowSurface.swapBuffers();
+
+            mOffscreenSurface.makeCurrent();
+            GLES20.glViewport(0, 0, VIDEO_WIDTH, VIDEO_HEIGHT);
+            mFullFrameBlit.drawFrame(mTextureId, mTmpMatrix);
+            mOffscreenSurface.getPixels();//here you can get the pixels
+        }
+    };
+
     TextureView.SurfaceTextureListener mSurfaceTextureListener=new TextureView.SurfaceTextureListener() {
         @Override
         public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
-            //surface.detachFromGLContext();
+            viewWidth=width;
+            viewHeight=height;
+
+            mWindowSurface=new WindowSurface(mEglCore,surface);
+            mWindowSurface.makeCurrent();
+            mFullFrameBlit = new FullFrameRect(
+                    new Texture2dProgram(Texture2dProgram.ProgramType.TEXTURE_EXT));
+            mTextureId = mFullFrameBlit.createTextureObject();
+            mCameraTexture=new SurfaceTexture(mTextureId);
+            mCameraTexture.setOnFrameAvailableListener(mFrameAvailableListener);
+
+            mOffscreenSurface=new OffscreenSurface(mEglCore,VIDEO_WIDTH,VIDEO_HEIGHT);
 
             if (mCamera == null) {
                 // Ideally, the frames from the camera are at the same resolution as the input to
@@ -163,26 +139,9 @@ public class CameraWithTextureView extends Activity{
 
         @Override
         public void onSurfaceTextureUpdated(SurfaceTexture surface) {
-            if (mCamera == null) {
-                // Ideally, the frames from the camera are at the same resolution as the input to
-                // the video encoder so we don't have to scale.
-                openCamera(VIDEO_WIDTH, VIDEO_HEIGHT, DESIRED_PREVIEW_FPS);
-            }
-            if(!previewStarted)startPreview();
-
-            surface.getTransformMatrix(mTmpMatrix);
-
-            mHandler.sendEmptyMessage(MainHandler.MSG_FRAME_AVAILABLE);
         }
     };
 
-    private void drawFrame(){
-
-        mOffscreenSurface.makeCurrent();
-        GLES20.glViewport(0, 0, VIDEO_WIDTH,VIDEO_HEIGHT);
-        mFullFrameBlit.drawFrame(mTextureId,mTmpMatrix);//needs to render to the surface first and needs the textureId to render
-        mOffscreenSurface.getPixels();
-    }
 
     private void configureTransform(final int viewWidth, final int viewHeight) {
         final int rotation = ((WindowManager)getSystemService(WINDOW_SERVICE)).getDefaultDisplay().getRotation();
@@ -272,7 +231,7 @@ public class CameraWithTextureView extends Activity{
         if (mCamera != null) {
             Log.d(TAG, "starting camera preview");
             try {
-                mCamera.setPreviewTexture(displayTextureView.getSurfaceTexture());
+                mCamera.setPreviewTexture(mCameraTexture);
             } catch (IOException ioe) {
                 throw new RuntimeException(ioe);
             }
