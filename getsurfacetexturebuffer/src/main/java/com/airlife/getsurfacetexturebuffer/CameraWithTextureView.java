@@ -96,7 +96,7 @@ public class CameraWithTextureView extends Activity{
 
             mOffscreenSurface.makeCurrent();
             GLES20.glViewport(0, 0, VIDEO_WIDTH, VIDEO_HEIGHT);
-            mFullFrameBlit.drawFrame(mTextureId, mTmpMatrix);
+            mFullFrameBlit.drawFlippedFrame(mTextureId, mTmpMatrix);
             mOffscreenSurface.getPixels();//here you can get the pixels
         }
     };

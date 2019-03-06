@@ -16,6 +16,8 @@
 
 package com.airlife.getsurfacetexturebuffer.gles;
 
+import android.graphics.Matrix;
+
 /**
  * This class essentially represents a viewport-sized sprite that will be rendered with
  * a texture, usually from an external source like the camera or video decoder.
@@ -81,6 +83,24 @@ public class FullFrameRect {
     public void drawFrame(int textureId, float[] texMatrix) {
         // Use the identity matrix for MVP so our 2x2 FULL_RECTANGLE covers the viewport.
         mProgram.draw(GlUtil.IDENTITY_MATRIX, mRectDrawable.getVertexArray(), 0,
+                mRectDrawable.getVertexCount(), mRectDrawable.getCoordsPerVertex(),
+                mRectDrawable.getVertexStride(),
+                texMatrix, mRectDrawable.getTexCoordArray(), textureId,
+                mRectDrawable.getTexCoordStride());
+    }
+
+    private float[] mFlipMatrix=null;//just for drawwing the flipped frame
+    public void drawFlippedFrame(int textureId, float[] texMatrix) {
+        // Use the identity matrix for MVP so our 2x2 FULL_RECTANGLE covers the viewport.
+        if(mFlipMatrix==null){
+            mFlipMatrix=GlUtil.IDENTITY_MATRIX.clone();
+            Matrix m=new Matrix();
+            m.setValues(mFlipMatrix);
+            m.postScale(1,-1f);
+            m.getValues(mFlipMatrix);
+        }
+
+        mProgram.draw(mFlipMatrix, mRectDrawable.getVertexArray(), 0,
                 mRectDrawable.getVertexCount(), mRectDrawable.getCoordsPerVertex(),
                 mRectDrawable.getVertexStride(),
                 texMatrix, mRectDrawable.getTexCoordArray(), textureId,
